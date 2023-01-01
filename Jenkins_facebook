@@ -1,0 +1,43 @@
+node{
+    def mavenHome = tool name: 'maven3.8.6'
+    stage('1cloneCode'){
+        git "https://github.com/Facebook25/maven-web-application" 
+}
+stage('2Test&Build'){
+    sh "${mavenHome}/bin/mvn clean package" 
+}
+    stage('3codeQuality'){
+        sh "${mavenHome}/bin/mvn sonar:sonar" 
+}
+        stage('4uploadArtifacts'){
+            sh "${mavenHome}/bin/mvn deploy" 
+}
+            
+        stage('5Deploy2UAT'){
+            sh "echo 'deploy to UAT' "
+            deploy adapters: [tomcat9(credentialsId: 'tomcat-credentials', path: '', url: 'http://172.31.94.135:8080')], contextPath: null, war: 'target/*war'
+            
+        
+        }
+    stage('6approvalGate'){
+    sh "echo 'deploy for review' "
+    timeout(time: 5, unit: 'DAYS') {
+    input message: 'Application ready for deployment, Please review and approve'    
+    }
+    } 
+    stage('Deploy2prod'){
+    sh "echo 'deployment to production environment'"
+    deploy adapters: [tomcat9(credentialsId: 'tomcat-credentials', path: '', url: 'http://172.31.94.135:8080/')], contextPath: null, war: 'target/*war'
+    }
+    
+    stage('EmailNotification'){
+    sh "echo 'sending email to the team'"
+    emailext body: '''Hi All,
+Please kindly check the status of the build.
+
+Thanks
+Joojo''', recipientProviders: [buildUser(), contributor(), culprits(), previous(), developers(), requestor(), brokenBuildSuspects(), brokenTestsSuspects(), upstreamDevelopers()], subject: 'Build Status', to: 'facebookteam@gmail.com'
+    }
+    }
+    
+    
